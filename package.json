@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node server/index.js",
     "import": "node server/import-csv.js",
+    "sync-nox": "node server/sync-noxapi.js",
     "fetch-images": "node server/fetch-images.js",
     "dev": "node server/index.js"
   },

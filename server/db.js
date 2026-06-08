@@ -254,6 +254,13 @@ function getTrending(limit = 8) {
   return shuffled.slice(0, limit).map((p) => p.name);
 }
 
+function getProductsSlice({ offset = 0, limit = 20, requireLink = true } = {}) {
+  let items = load().products;
+  if (requireLink) items = items.filter((p) => p.product_link);
+  const total = items.length;
+  return { items: items.slice(offset, offset + limit), total };
+}
+
 module.exports = {
   dbPath,
   upsertProduct,
@@ -262,6 +269,7 @@ module.exports = {
   getAll,
   getById,
   getByProductId,
+  getProductsSlice,
   create,
   update,
   remove,

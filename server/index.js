@@ -1,11 +1,21 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const multer = require('multer');
 const db = require('./db');
 const { importCsvContent } = require('./csv-import');
 const { getProductImage } = require('./images');
 const { buildPriceDisplay, buildBuyerMessage } = require('./price');
 const { buildPromoInfo } = require('./promo');
+const { syncProduct } = require('./noxapi');
+
+const envPath = path.join(__dirname, '..', '.env');
+if (fs.existsSync(envPath)) {
+  for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
+    const m = line.match(/^([^#= \t]+)=(.*)$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
+  }
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -195,6 +205,43 @@ app.post('/api/admin/import-csv', requireAdmin, upload.single('file'), (req, res
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+app.post('/api/admin/sync-noxapi', requireAdmin, async (req, res) => {
+  if (!process.env.NOXAPI_TOKEN) {
+    return res.status(400).json({ error: 'Chưa cấu hình NOXAPI_TOKEN trên server' });
+  }
+  const limit = Math.min(25, Math.max(1, parseInt(req.body.limit, 10) || 10));
+  const offset = Math.max(0, parseInt(req.body.offset, 10) || 0);
+  const { items, total } = db.getProductsSlice({ offset, limit });
+
+  let updated = 0;
+  let failed = 0;
+  const errors = [];
+
+  for (let i = 0; i < items.length; i++) {
+    const product = items[i];
+    const result = await syncProduct(product, { delayMs: i < items.length - 1 ? 350 : 0 });
+    if (result.ok) {
+      db.update(product.id, result.fields);
+      updated++;
+    } else {
+      failed++;
+      if (errors.length < 5) errors.push({ id: product.id, name: product.name.slice(0, 40), reason: result.reason });
+    }
+  }
+
+  res.json({
+    ok: true,
+    updated,
+    failed,
+    processed: items.length,
+    offset,
+    nextOffset: offset + items.length,
+    total,
+    done: offset + items.length >= total,
+    errors,
+  });
 });
 
 if (require.main === module) {

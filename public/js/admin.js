@@ -213,6 +213,36 @@ async function uploadCsv(file) {
   loadProducts();
 }
 
+async function syncNoxBatch(offset = 0) {
+  const data = await api('/api/admin/sync-noxapi', {
+    method: 'POST',
+    body: JSON.stringify({ limit: 10, offset }),
+  });
+  return data;
+}
+
+async function syncNoxAll() {
+  if (!confirm('Sync giá/ảnh từ Shopee qua NoxAPI? (10 SP/lượt, tốn credit API)')) return;
+  let offset = 0;
+  let totalUpdated = 0;
+  $('#syncNoxBtn').disabled = true;
+  try {
+    for (;;) {
+      toast(`Đang sync... offset ${offset}`);
+      const data = await syncNoxBatch(offset);
+      totalUpdated += data.updated;
+      if (data.done || data.processed === 0) break;
+      offset = data.nextOffset;
+    }
+    toast(`NoxAPI: đã cập nhật ${totalUpdated} sản phẩm`);
+    loadProducts();
+  } catch (err) {
+    toast(err.message);
+  } finally {
+    $('#syncNoxBtn').disabled = false;
+  }
+}
+
 function init() {
   $('#loginBtn').addEventListener('click', login);
   $('#loginPassword').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
@@ -241,6 +271,8 @@ function init() {
     }
     e.target.value = '';
   });
+
+  $('#syncNoxBtn')?.addEventListener('click', syncNoxAll);
 
   if (token) showPanel();
 }
