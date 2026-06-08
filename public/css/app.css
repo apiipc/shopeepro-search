@@ -132,6 +132,18 @@ main { padding-top: 72px; min-height: 100vh; }
 }
 @media (min-width: 768px) { .product-grid { grid-template-columns: repeat(3, 1fr); } }
 @media (min-width: 1200px) { .product-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 1400px) { .product-grid { grid-template-columns: repeat(5, 1fr); } }
+@media (min-width: 1680px) { .product-grid { grid-template-columns: repeat(6, 1fr); } }
+
+.section-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  margin-bottom: 16px; flex-wrap: wrap;
+}
+.section-head h2 { font-size: 20px; font-weight: 600; margin: 0; }
+.section-count { font-size: 13px; color: var(--on-surface-variant); }
+.load-more-wrap { text-align: center; padding: 24px 0 8px; }
+.load-more-hint { font-size: 12px; color: var(--on-surface-variant); margin: 8px 0 0; }
+#scrollSentinel { height: 1px; }
 
 .product-card {
   background: white; border: 1px solid #e8e8e8; border-radius: 8px;

@@ -88,10 +88,18 @@
       </div>
     </div>
 
-    <!-- Featured on home -->
-    <section class="container" id="featuredSection" style="padding:32px 16px">
-      <h2 style="font-size:20px;font-weight:600;margin-bottom:16px">🔥 Deal hấp dẫn hôm nay</h2>
+    <!-- Sản phẩm trang chủ -->
+    <section class="container home-feed" id="featuredSection" style="padding:24px 16px 48px">
+      <div class="section-head">
+        <h2>🔥 Deal hấp dẫn hôm nay</h2>
+        <span class="section-count" id="homeFeedCount"></span>
+      </div>
       <div class="product-grid" id="featuredGrid"></div>
+      <div class="load-more-wrap" id="loadMoreWrap">
+        <button type="button" class="btn btn-primary" id="loadMoreBtn">Tải thêm sản phẩm</button>
+        <p class="load-more-hint" id="loadMoreHint"></p>
+      </div>
+      <div id="scrollSentinel" aria-hidden="true"></div>
     </section>
   </main>
 

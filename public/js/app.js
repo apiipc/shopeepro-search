@@ -6,6 +6,10 @@ const state = {
   totalPages: 1,
 };
 
+const PAGE_SIZE = 48;
+const homeFeed = { page: 1, loading: false, done: false, total: 0, shown: 0 };
+let scrollObserver = null;
+
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 
@@ -109,7 +113,7 @@ async function fetchSearch() {
     q: state.query,
     page: state.page,
     sort: state.sort,
-    limit: 24,
+    limit: PAGE_SIZE,
   });
   if (state.shop) params.set('shop', state.shop);
 
@@ -188,13 +192,85 @@ function showHome() {
   $('#heroSection').style.display = '';
   $('#featuredSection').style.display = '';
   $('#resultsSection').style.display = 'none';
-  loadFeatured();
+  resetHomeFeed();
+  loadFeatured(false);
+  setupInfiniteScroll();
 }
 
-async function loadFeatured() {
-  const res = await fetch('/api/search?limit=8&sort=deal');
-  const data = await res.json();
-  $('#featuredGrid').innerHTML = data.items.map(renderProductCard).join('');
+function resetHomeFeed() {
+  homeFeed.page = 1;
+  homeFeed.loading = false;
+  homeFeed.done = false;
+  homeFeed.total = 0;
+  homeFeed.shown = 0;
+}
+
+function updateHomeFeedMeta() {
+  const countEl = $('#homeFeedCount');
+  const hintEl = $('#loadMoreHint');
+  if (countEl) {
+    countEl.textContent = homeFeed.total
+      ? `Đang hiển thị ${homeFeed.shown.toLocaleString('vi-VN')} / ${homeFeed.total.toLocaleString('vi-VN')}`
+      : '';
+  }
+  if (hintEl) {
+    hintEl.textContent = homeFeed.done
+      ? 'Đã hiển thị tất cả sản phẩm'
+      : 'Cuộn xuống hoặc bấm Tải thêm';
+  }
+  const wrap = $('#loadMoreWrap');
+  const btn = $('#loadMoreBtn');
+  if (wrap && btn) {
+    wrap.style.display = homeFeed.done ? 'none' : '';
+    btn.disabled = homeFeed.loading;
+    btn.textContent = homeFeed.loading ? 'Đang tải...' : 'Tải thêm sản phẩm';
+  }
+}
+
+async function loadFeatured(append = false) {
+  if (homeFeed.loading || homeFeed.done) return;
+  homeFeed.loading = true;
+  updateHomeFeedMeta();
+
+  const grid = $('#featuredGrid');
+  if (!append) grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;padding:32px">Đang tải...</p>';
+
+  try {
+    const res = await fetch(`/api/search?limit=${PAGE_SIZE}&page=${homeFeed.page}&sort=deal`);
+    const data = await res.json();
+    homeFeed.total = data.total;
+
+    if (!append) grid.innerHTML = '';
+    if (data.items.length === 0 && !append) {
+      grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;padding:32px">Chưa có sản phẩm</p>';
+      homeFeed.done = true;
+    } else {
+      grid.insertAdjacentHTML('beforeend', data.items.map(renderProductCard).join(''));
+      homeFeed.shown += data.items.length;
+      if (homeFeed.page >= data.totalPages || data.items.length === 0) homeFeed.done = true;
+      else homeFeed.page += 1;
+    }
+  } catch {
+    if (!append) grid.innerHTML = '<p style="grid-column:1/-1;color:#ba1a1a">Lỗi tải dữ liệu</p>';
+  }
+
+  homeFeed.loading = false;
+  updateHomeFeedMeta();
+}
+
+function setupInfiniteScroll() {
+  if (scrollObserver) scrollObserver.disconnect();
+  const sentinel = $('#scrollSentinel');
+  if (!sentinel) return;
+  scrollObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0]?.isIntersecting && !homeFeed.done && !homeFeed.loading) {
+        loadFeatured(true);
+      }
+    },
+    { rootMargin: '400px' }
+  );
+  scrollObserver.observe(sentinel);
 }
 
 async function loadStats() {
@@ -270,6 +346,7 @@ function initForms() {
   };
   $('#heroSearchForm')?.addEventListener('submit', (e) => handleSubmit(e, $('#heroSearchInput')));
   $('#navSearchForm')?.addEventListener('submit', (e) => handleSubmit(e, $('#navSearchInput')));
+  $('#loadMoreBtn')?.addEventListener('click', () => loadFeatured(true));
 }
 
 function init() {

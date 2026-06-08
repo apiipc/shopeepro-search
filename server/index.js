@@ -81,7 +81,7 @@ app.get('/api/search', (req, res) => {
     shop: (req.query.shop || '').trim(),
     sort: req.query.sort || 'popular',
     page: Math.max(1, parseInt(req.query.page, 10) || 1),
-    limit: Math.min(48, Math.max(1, parseInt(req.query.limit, 10) || 24)),
+    limit: Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 48)),
   });
   res.json({
     query: req.query.q || '',
