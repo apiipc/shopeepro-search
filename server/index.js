@@ -8,6 +8,7 @@ const { streamProductImage } = require('./images');
 const { buildPriceDisplay, buildBuyerMessage } = require('./price');
 const { buildPromoInfo } = require('./promo');
 const { syncProduct } = require('./noxapi');
+const { runAutoSync } = require('./auto-sync');
 
 const envPath = path.join(__dirname, '..', '.env');
 if (fs.existsSync(envPath)) {
@@ -20,15 +21,58 @@ if (fs.existsSync(envPath)) {
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const CRON_SECRET = process.env.CRON_SECRET || '';
+
+let autoSyncRunning = false;
+
+async function maybeRunBackgroundSync() {
+  if (autoSyncRunning || !process.env.NOXAPI_TOKEN) return;
+  const last = await db.getMeta('last_auto_sync');
+  const minGap = parseInt(process.env.AUTO_SYNC_INTERVAL_MS || '1800000', 10);
+  if (last && Date.now() - parseInt(last, 10) < minGap) return;
+
+  autoSyncRunning = true;
+  runAutoSync()
+    .then(async (r) => {
+      if (r.ok) await db.setMeta('last_auto_sync', String(Date.now()));
+      console.log(`Auto-sync: ${r.updated}/${r.processed} cập nhật`);
+    })
+    .catch((err) => console.error('Auto-sync lỗi:', err.message))
+    .finally(() => {
+      autoSyncRunning = false;
+    });
+}
 
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
+
+app.use(async (_req, _res, next) => {
+  try {
+    await db.init();
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.use((_req, _res, next) => {
+  maybeRunBackgroundSync();
+  next();
+});
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 function requireAdmin(req, res, next) {
   const token = req.headers['x-admin-token'] || req.query.token;
   if (token !== ADMIN_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
+  next();
+}
+
+function requireCron(req, res, next) {
+  const auth = req.headers.authorization || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : req.query.secret;
+  if (CRON_SECRET && token !== CRON_SECRET) return res.status(401).json({ error: 'Unauthorized' });
+  if (!CRON_SECRET && process.env.VERCEL) return res.status(401).json({ error: 'CRON_SECRET chưa cấu hình' });
   next();
 }
 
@@ -75,8 +119,19 @@ function mapProduct(row, { includeCommission = false } = {}) {
   return base;
 }
 
-app.get('/api/search', (req, res) => {
-  const result = db.search({
+app.get('/api/health', async (_req, res) => {
+  const s = await db.stats();
+  res.json({
+    ok: true,
+    db: db.usePostgres() ? 'postgres' : 'json',
+    products: s.totalAll,
+    active: s.totalProducts,
+    noxapi: !!process.env.NOXAPI_TOKEN,
+  });
+});
+
+app.get('/api/search', async (req, res) => {
+  const result = await db.search({
     q: (req.query.q || '').trim(),
     shop: (req.query.shop || '').trim(),
     sort: req.query.sort || 'popular',
@@ -93,19 +148,24 @@ app.get('/api/search', (req, res) => {
   });
 });
 
-app.get('/api/trending', (_req, res) => {
-  res.json({ items: db.getTrending(8) });
+app.get('/api/trending', async (_req, res) => {
+  res.json({ items: await db.getTrending(8) });
 });
 
-app.get('/api/shops', (_req, res) => {
-  res.json({ items: db.getShops(20) });
+app.get('/api/shops', async (_req, res) => {
+  res.json({ items: await db.getShops(20) });
 });
 
-app.get('/api/stats', (_req, res) => {
-  res.json(db.stats());
+app.get('/api/stats', async (_req, res) => {
+  res.json(await db.stats());
 });
 
-// Proxy ảnh qua server — tránh chặn hotlink Shopee CDN trên trình duyệt
+app.get('/api/cron/auto-sync', requireCron, async (_req, res) => {
+  const result = await runAutoSync({ limit: parseInt(process.env.AUTO_SYNC_BATCH || '25', 10) });
+  if (result.ok) await db.setMeta('last_auto_sync', String(Date.now()));
+  res.json(result);
+});
+
 app.get('/api/product-image/:productId', async (req, res) => {
   const productId = req.params.productId;
   try {
@@ -121,8 +181,8 @@ app.post('/api/admin/login', (req, res) => {
   res.status(401).json({ error: 'Sai mật khẩu' });
 });
 
-app.get('/api/admin/products', requireAdmin, (req, res) => {
-  const result = db.getAll({
+app.get('/api/admin/products', requireAdmin, async (req, res) => {
+  const result = await db.getAll({
     q: (req.query.q || '').trim(),
     page: Math.max(1, parseInt(req.query.page, 10) || 1),
     limit: Math.min(100, parseInt(req.query.limit, 10) || 20),
@@ -136,12 +196,12 @@ app.get('/api/admin/products', requireAdmin, (req, res) => {
   });
 });
 
-app.post('/api/admin/products', requireAdmin, (req, res) => {
+app.post('/api/admin/products', requireAdmin, async (req, res) => {
   const p = req.body;
   if (!p.productId || !p.name || !p.affiliateLink) {
     return res.status(400).json({ error: 'Thiếu productId, name hoặc affiliateLink' });
   }
-  const row = db.create({
+  const row = await db.create({
     product_id: String(p.productId),
     name: p.name,
     price: p.price || '',
@@ -160,12 +220,12 @@ app.post('/api/admin/products', requireAdmin, (req, res) => {
   res.status(201).json(mapProduct(row, { includeCommission: true }));
 });
 
-app.put('/api/admin/products/:id', requireAdmin, (req, res) => {
+app.put('/api/admin/products/:id', requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id, 10);
-  const existing = db.getById(id);
+  const existing = await db.getById(id);
   if (!existing) return res.status(404).json({ error: 'Không tìm thấy' });
   const p = req.body;
-  const row = db.update(id, {
+  const row = await db.update(id, {
     product_id: p.productId ?? existing.product_id,
     name: p.name ?? existing.name,
     price: p.price ?? existing.price,
@@ -184,16 +244,16 @@ app.put('/api/admin/products/:id', requireAdmin, (req, res) => {
   res.json(mapProduct(row, { includeCommission: true }));
 });
 
-app.delete('/api/admin/products/:id', requireAdmin, (req, res) => {
-  const ok = db.remove(parseInt(req.params.id, 10));
+app.delete('/api/admin/products/:id', requireAdmin, async (req, res) => {
+  const ok = await db.remove(parseInt(req.params.id, 10));
   if (!ok) return res.status(404).json({ error: 'Không tìm thấy' });
   res.json({ ok: true });
 });
 
-app.post('/api/admin/import-csv', requireAdmin, upload.single('file'), (req, res) => {
+app.post('/api/admin/import-csv', requireAdmin, upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Chưa chọn file CSV' });
   try {
-    const result = importCsvContent(req.file.buffer.toString('utf-8'));
+    const result = await importCsvContent(req.file.buffer.toString('utf-8'));
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -206,7 +266,7 @@ app.post('/api/admin/sync-noxapi', requireAdmin, async (req, res) => {
   }
   const limit = Math.min(25, Math.max(1, parseInt(req.body.limit, 10) || 10));
   const offset = Math.max(0, parseInt(req.body.offset, 10) || 0);
-  const { items, total } = db.getProductsSlice({ offset, limit });
+  const { items, total } = await db.getProductsSlice({ offset, limit });
 
   let updated = 0;
   let failed = 0;
@@ -216,7 +276,7 @@ app.post('/api/admin/sync-noxapi', requireAdmin, async (req, res) => {
     const product = items[i];
     const result = await syncProduct(product, { delayMs: i < items.length - 1 ? 350 : 0 });
     if (result.ok) {
-      db.update(product.id, result.fields);
+      await db.update(product.id, result.fields);
       updated++;
     } else {
       failed++;
@@ -238,12 +298,15 @@ app.post('/api/admin/sync-noxapi', requireAdmin, async (req, res) => {
 });
 
 if (require.main === module) {
-  app.listen(PORT, () => {
-    const s = db.stats();
+  db.init().then(async () => {
+    const s = await db.stats();
     console.log(`ShopeePro chạy tại http://localhost:${PORT}`);
     console.log(`Admin: http://localhost:${PORT}/admin.html`);
+    console.log(`DB: ${db.usePostgres() ? 'Postgres' : 'JSON'}`);
     console.log(`Sản phẩm: ${s.totalAll} (${s.totalProducts} đang hiển thị)`);
     if (s.totalAll === 0) console.log('Chạy: npm run import');
+    maybeRunBackgroundSync();
+    app.listen(PORT);
   });
 }
 

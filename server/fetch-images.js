@@ -2,7 +2,9 @@ const db = require('./db');
 const { getProductImage } = require('./images');
 
 async function main() {
-  const products = db.getAll({ limit: 99999 }).items.filter((p) => !p.image_url && p.product_link);
+  await db.init();
+  const { items } = await db.getAll({ limit: 99999 });
+  const products = items.filter((p) => !p.image_url && p.product_link);
   console.log(`Cần tải ảnh cho ${products.length} sản phẩm...\n`);
 
   let ok = 0;

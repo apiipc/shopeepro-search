@@ -97,7 +97,7 @@ async function getProductImage(productId, productLink) {
   const cache = loadCache();
   if (cache[productId]) return normalizeShopeeImageUrl(cache[productId]);
 
-  const product = db.getByProductId(productId);
+  const product = await db.getByProductId(productId);
   const link = productLink || product?.product_link;
 
   if (product?.image_url) {
@@ -115,14 +115,14 @@ async function getProductImage(productId, productLink) {
     cache[productId] = imageUrl;
     saveCache(cache);
     if (product?.id) {
-      db.update(product.id, { image_url: imageUrl });
+      await db.update(product.id, { image_url: imageUrl });
     }
   }
   return imageUrl;
 }
 
 async function streamProductImage(productId, res) {
-  const product = db.getByProductId(productId);
+  const product = await db.getByProductId(productId);
   let imageUrl = product?.image_url ? normalizeShopeeImageUrl(product.image_url) : null;
   if (!imageUrl) imageUrl = await getProductImage(productId, product?.product_link);
   if (!imageUrl) return false;

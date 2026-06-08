@@ -4,12 +4,12 @@ const { importCsvContent } = require('./csv-import');
 
 const CSV_DIR = path.join(__dirname, '..', '..', '..', 'link sản phẩm');
 
-function importFile(filePath) {
+async function importFile(filePath) {
   const content = fs.readFileSync(filePath, 'utf-8');
   return importCsvContent(content);
 }
 
-function main() {
+async function main() {
   if (!fs.existsSync(CSV_DIR)) {
     console.error('Không tìm thấy:', CSV_DIR);
     process.exit(1);
@@ -18,7 +18,7 @@ function main() {
   let totals = { created: 0, updated: 0, duplicatesInFile: 0, skipped: 0, processed: 0 };
 
   for (const file of files) {
-    const r = importFile(path.join(CSV_DIR, file));
+    const r = await importFile(path.join(CSV_DIR, file));
     console.log(
       `  ${file}: ${r.created} mới, ${r.updated} cập nhật, ${r.duplicatesInFile} trùng trong file, ${r.skipped} bỏ qua`
     );
@@ -34,4 +34,7 @@ function main() {
   );
 }
 
-main();
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

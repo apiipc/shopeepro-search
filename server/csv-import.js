@@ -32,7 +32,7 @@ function dedupeByProductId(rows) {
   return { unique: [...map.values()], duplicatesInFile };
 }
 
-function importCsvContent(content) {
+async function importCsvContent(content) {
   const rows = parse(content, {
     columns: true,
     skip_empty_lines: true,
@@ -52,7 +52,7 @@ function importCsvContent(content) {
   }
 
   const { unique, duplicatesInFile } = dedupeByProductId(parsed);
-  const { created, updated } = importProducts(unique);
+  const { created, updated } = await importProducts(unique);
 
   return {
     ok: true,

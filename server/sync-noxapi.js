@@ -20,7 +20,8 @@ async function main() {
     process.exit(1);
   }
 
-  const { items, total } = db.getProductsSlice({ offset, limit });
+  await db.init();
+  const { items, total } = await db.getProductsSlice({ offset, limit });
   console.log(`Sync NoxAPI: ${items.length} SP (offset ${offset}/${total})`);
 
   let updated = 0;
@@ -30,7 +31,7 @@ async function main() {
     const p = items[i];
     const result = await syncProduct(p, { delayMs: i < items.length - 1 ? 350 : 0 });
     if (result.ok) {
-      db.update(p.id, result.fields);
+      await db.update(p.id, result.fields);
       updated++;
       console.log(`  ✓ ${p.product_id} → ${result.fields.price}${result.fields.original_price ? ` (gốc ${result.fields.original_price})` : ''}`);
     } else {
