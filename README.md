@@ -10,7 +10,7 @@ npm run import   # nạp CSV từ thư mục link sản phẩm (local)
 npm start        # http://localhost:3000
 ```
 
-Admin: `/admin.html` — mật khẩu mặc định `admin123` (đổi qua biến `ADMIN_PASSWORD`).
+Admin: `/admin.html` — đặt mật khẩu qua biến môi trường `ADMIN_PASSWORD`.
 
 ## Deploy Vercel
 
