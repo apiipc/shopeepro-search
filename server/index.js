@@ -4,7 +4,7 @@ const fs = require('fs');
 const multer = require('multer');
 const db = require('./db');
 const { importCsvContent } = require('./csv-import');
-const { getProductImage } = require('./images');
+const { streamProductImage } = require('./images');
 const { buildPriceDisplay, buildBuyerMessage } = require('./price');
 const { buildPromoInfo } = require('./promo');
 const { syncProduct } = require('./noxapi');
@@ -105,19 +105,12 @@ app.get('/api/stats', (_req, res) => {
   res.json(db.stats());
 });
 
-// Lazy-load ảnh sản phẩm từ Shopee (cache + lưu DB)
+// Proxy ảnh qua server — tránh chặn hotlink Shopee CDN trên trình duyệt
 app.get('/api/product-image/:productId', async (req, res) => {
   const productId = req.params.productId;
-  const product = db.getByProductId(productId);
-
-  if (product?.image_url) {
-    return res.redirect(302, product.image_url);
-  }
-
   try {
-    const imageUrl = await getProductImage(productId, product?.product_link);
-    if (imageUrl) return res.redirect(302, imageUrl);
-    res.status(404).send('No image');
+    const ok = await streamProductImage(productId, res);
+    if (!ok) res.status(404).send('No image');
   } catch {
     res.status(502).send('Failed to fetch image');
   }

@@ -41,7 +41,6 @@ function placeholderImg(name) {
 }
 
 function productImageUrl(p) {
-  if (p.imageUrl) return p.imageUrl;
   if (p.productId) return `/api/product-image/${encodeURIComponent(p.productId)}`;
   return placeholderImg(p.name);
 }
@@ -85,7 +84,7 @@ function renderProductCard(p) {
   return `
     <a class="product-card${p.hasPromo ? ' product-card--deal' : ''}" href="${p.affiliateLink}" target="_blank" rel="noopener noreferrer">
       <div class="product-img">
-        <img src="${img}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${fallback}'"/>
+        <img src="${img}" alt="" loading="lazy" referrerpolicy="no-referrer" decoding="async" onerror="this.onerror=null;this.src='${fallback}'"/>
         ${cornerBadge}
       </div>
       <div class="product-body">

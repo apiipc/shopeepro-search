@@ -1,3 +1,5 @@
+const { normalizeShopeeImageUrl } = require('./images');
+
 const NOXAPI_BASE = process.env.NOXAPI_URL || 'http://api.noxapi.com/v1/shopee';
 
 function getToken() {
@@ -46,18 +48,19 @@ function extractPrices(data) {
 function mapItemToUpdate(data) {
   if (!data) return null;
   const prices = extractPrices(data);
-  const image = Array.isArray(data.images) && data.images[0] ? data.images[0] : '';
-  const revenue =
-    data.sold_count_display ||
-    data.historical_sold_display ||
-    data.global_sold_display ||
-    (data.sold_count ? String(data.sold_count) : '');
+  const imageRaw = Array.isArray(data.images) && data.images[0] ? data.images[0] : '';
+  const imageFull = imageRaw.startsWith('http') ? imageRaw : imageRaw ? `https://cf.shopee.vn/file/${imageRaw}` : '';
 
   const update = {
     price: prices.price,
     original_price: prices.original_price,
-    image_url: image.startsWith('http') ? image : image ? `https://cf.shopee.vn/file/${image}` : '',
-    revenue: revenue || undefined,
+    image_url: imageFull ? normalizeShopeeImageUrl(imageFull) : '',
+    revenue:
+      data.sold_count_display ||
+      data.historical_sold_display ||
+      data.global_sold_display ||
+      (data.sold_count ? String(data.sold_count) : '') ||
+      undefined,
   };
 
   if (data.title) update.name = data.title;
