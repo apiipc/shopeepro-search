@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ShopeePro | Tìm kiếm sản phẩm</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/css/app.css"/>
+</head>
+<body>
+  <header class="navbar">
+    <div class="navbar-inner">
+      <a class="logo" href="/">ShopeePro</a>
+      <form class="nav-search" id="navSearchForm">
+        <input type="text" id="navSearchInput" placeholder="Tìm kiếm sản phẩm, thương hiệu..."/>
+        <button type="submit"><span class="material-symbols-outlined" style="font-size:18px;color:white">search</span></button>
+      </form>
+      <a href="/admin.html" class="admin-link">Admin</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero (home only) -->
+    <section class="hero" id="heroSection">
+      <h1>Săn deal <span>Shopee</span><br/>giá tốt — mua nhanh</h1>
+      <p class="hero-sub">Deal hot · giá rõ · biết tiết kiệm bao nhiêu · mua nhanh trên Shopee</p>
+      <form class="hero-search" id="heroSearchForm">
+        <span class="material-symbols-outlined" style="color:#5b403b">search</span>
+        <input type="text" id="heroSearchInput" placeholder="Tìm kiếm sản phẩm, thương hiệu, shop..."/>
+        <button type="submit" class="shopee-gradient">Tìm kiếm</button>
+      </form>
+      <div class="trending" id="trendingTags"></div>
+    </section>
+
+    <div class="stats-bar" id="statsBar"></div>
+
+    <!-- Search results -->
+    <div class="container" id="resultsSection" style="display:none">
+      <div class="search-layout">
+        <aside class="sidebar">
+          <h2 style="font-size:16px;display:flex;align-items:center;gap:6px;margin-bottom:16px">
+            <span class="material-symbols-outlined">filter_alt</span> Bộ lọc
+          </h2>
+          <div class="filter-group">
+            <h3>Cửa hàng</h3>
+            <select id="shopFilter"><option value="">Tất cả shop</option></select>
+          </div>
+          <div class="filter-group">
+            <h3>Sắp xếp</h3>
+            <select id="sortFilter">
+              <option value="popular">Phổ biến</option>
+              <option value="deal">Deal hấp dẫn</option>
+              <option value="price_asc">Giá thấp → cao</option>
+              <option value="price_desc">Giá cao → thấp</option>
+            </select>
+          </div>
+        </aside>
+
+        <div style="flex:1;min-width:0">
+          <div class="result-meta" id="resultMeta"></div>
+          <div class="sort-bar hide-scrollbar" id="sortBar">
+            <span style="color:#5b403b;font-size:14px;margin-right:8px">Sắp xếp:</span>
+            <button type="button" class="sort-btn active" data-sort="popular">Phổ biến</button>
+            <button type="button" class="sort-btn" data-sort="deal">Deal hot</button>
+            <button type="button" class="sort-btn" data-sort="price_asc">Giá thấp</button>
+            <button type="button" class="sort-btn" data-sort="price_desc">Giá cao</button>
+          </div>
+          <div class="product-grid" id="productGrid"></div>
+          <div class="pagination" id="pagination"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Featured on home -->
+    <section class="container" id="featuredSection" style="padding:32px 16px">
+      <h2 style="font-size:20px;font-weight:600;margin-bottom:16px">🔥 Deal hấp dẫn hôm nay</h2>
+      <div class="product-grid" id="featuredGrid"></div>
+    </section>
+  </main>
+
+  <footer>
+    <p>© 2026 ShopeePro — Săn deal Shopee, giá minh bạch</p>
+  </footer>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

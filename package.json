@@ -1,0 +1,20 @@
+{
+  "name": "shopeepro-search",
+  "version": "1.0.0",
+  "description": "ShopeePro - Săn deal Shopee affiliate",
+  "main": "server/index.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "import": "node server/import-csv.js",
+    "fetch-images": "node server/fetch-images.js",
+    "dev": "node server/index.js"
+  },
+  "dependencies": {
+    "csv-parse": "^5.6.0",
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.1"
+  }
+}
