@@ -236,7 +236,9 @@ async function loadFeatured(append = false) {
 
   try {
     const res = await fetch(`/api/search?limit=${PAGE_SIZE}&page=${homeFeed.page}&sort=deal`);
+    if (!res.ok) throw new Error(`API lỗi ${res.status}`);
     const data = await res.json();
+    if (!data.items) throw new Error('Dữ liệu không hợp lệ');
     homeFeed.total = data.total;
 
     if (!append) grid.innerHTML = '';
@@ -249,8 +251,11 @@ async function loadFeatured(append = false) {
       if (homeFeed.page >= data.totalPages || data.items.length === 0) homeFeed.done = true;
       else homeFeed.page += 1;
     }
-  } catch {
-    if (!append) grid.innerHTML = '<p style="grid-column:1/-1;color:#ba1a1a">Lỗi tải dữ liệu</p>';
+  } catch (err) {
+    if (!append) {
+      grid.innerHTML = `<p style="grid-column:1/-1;color:#ba1a1a;text-align:center;padding:32px">Lỗi tải sản phẩm — ${escapeHtml(err.message || 'thử F5')}</p>`;
+    }
+    homeFeed.done = true;
   }
 
   homeFeed.loading = false;

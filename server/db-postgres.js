@@ -1,8 +1,6 @@
 const fs = require('fs');
 const path = require('path');
 const { neon } = require('@neondatabase/serverless');
-const { parsePrice } = require('./price');
-const { dealScore } = require('./promo');
 const { normalize, mergeImportFields } = require('./db-shared');
 
 function pgUrl() {
@@ -173,61 +171,142 @@ async function importProducts(inputs) {
   return { created, updated };
 }
 
-function filterAndSort(items, { q, shop, sort }) {
-  let filtered = items;
-  if (q) {
-    const lq = q.toLowerCase();
-    filtered = filtered.filter(
-      (p) =>
-        p.name.toLowerCase().includes(lq) ||
-        (p.shop_name || '').toLowerCase().includes(lq) ||
-        String(p.product_id).includes(lq)
-    );
+function searchOrderClause(sort) {
+  switch (sort) {
+    case 'deal':
+      return sql`ORDER BY (CASE WHEN original_price IS NOT NULL AND original_price <> '' THEN 1 ELSE 0 END) DESC, updated_at DESC`;
+    case 'commission':
+      return sql`ORDER BY commission_rate DESC NULLS LAST, updated_at DESC`;
+    case 'price_asc':
+      return sql`ORDER BY price ASC NULLS LAST`;
+    case 'price_desc':
+      return sql`ORDER BY price DESC NULLS LAST`;
+    default:
+      return sql`ORDER BY updated_at DESC`;
   }
-  if (shop) filtered = filtered.filter((p) => (p.shop_name || '').toLowerCase().includes(shop.toLowerCase()));
-
-  const parsePriceLocal = (price) => parsePrice(price) || 0;
-  if (sort === 'price_asc') filtered.sort((a, b) => parsePriceLocal(a.price) - parsePriceLocal(b.price));
-  else if (sort === 'price_desc') filtered.sort((a, b) => parsePriceLocal(b.price) - parsePriceLocal(a.price));
-  else if (sort === 'deal') filtered.sort((a, b) => dealScore(b) - dealScore(a));
-  else if (sort === 'commission') {
-    filtered.sort(
-      (a, b) =>
-        parseFloat((b.commission_rate || '0').replace('%', '')) -
-        parseFloat((a.commission_rate || '0').replace('%', ''))
-    );
-  } else {
-    filtered.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
-  }
-  return filtered;
 }
 
 async function search({ q = '', shop = '', sort = 'popular', page = 1, limit = 24, activeOnly = true }) {
-  const rows = await sql`
-    SELECT * FROM products
-    ${activeOnly ? sql`WHERE active = 1` : sql``}
-  `;
-  const items = filterAndSort(rows.map(rowFromDb), { q, shop, sort });
-  const total = items.length;
   const offset = (page - 1) * limit;
-  return { items: items.slice(offset, offset + limit), total, totalPages: Math.ceil(total / limit) || 1 };
+  const qTrim = q.trim();
+  const shopTrim = shop.trim();
+  const orderClause = searchOrderClause(sort);
+  const qPat = qTrim ? `%${qTrim}%` : '';
+  const shopPat = shopTrim ? `%${shopTrim}%` : '';
+
+  let countRow;
+  let rows;
+
+  if (activeOnly && !qTrim && !shopTrim) {
+    [countRow] = await sql`SELECT COUNT(*)::int AS count FROM products WHERE active = 1`;
+    rows = await sql`
+      SELECT * FROM products WHERE active = 1
+      ${orderClause}
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+  } else if (activeOnly && qTrim && !shopTrim) {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int AS count FROM products
+      WHERE active = 1
+        AND (name ILIKE ${qPat} OR shop_name ILIKE ${qPat} OR product_id ILIKE ${qPat})
+    `;
+    rows = await sql`
+      SELECT * FROM products
+      WHERE active = 1
+        AND (name ILIKE ${qPat} OR shop_name ILIKE ${qPat} OR product_id ILIKE ${qPat})
+      ${orderClause}
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+  } else if (activeOnly && !qTrim && shopTrim) {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int AS count FROM products
+      WHERE active = 1 AND shop_name ILIKE ${shopPat}
+    `;
+    rows = await sql`
+      SELECT * FROM products
+      WHERE active = 1 AND shop_name ILIKE ${shopPat}
+      ${orderClause}
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+  } else if (activeOnly && qTrim && shopTrim) {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int AS count FROM products
+      WHERE active = 1
+        AND shop_name ILIKE ${shopPat}
+        AND (name ILIKE ${qPat} OR shop_name ILIKE ${qPat} OR product_id ILIKE ${qPat})
+    `;
+    rows = await sql`
+      SELECT * FROM products
+      WHERE active = 1
+        AND shop_name ILIKE ${shopPat}
+        AND (name ILIKE ${qPat} OR shop_name ILIKE ${qPat} OR product_id ILIKE ${qPat})
+      ${orderClause}
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+  } else if (!activeOnly && !qTrim && !shopTrim) {
+    [countRow] = await sql`SELECT COUNT(*)::int AS count FROM products`;
+    rows = await sql`
+      SELECT * FROM products
+      ${orderClause}
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+  } else {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int AS count FROM products
+      WHERE (${!qTrim} OR name ILIKE ${qPat} OR shop_name ILIKE ${qPat} OR product_id ILIKE ${qPat})
+        AND (${!shopTrim} OR shop_name ILIKE ${shopPat})
+    `;
+    rows = await sql`
+      SELECT * FROM products
+      WHERE (${!qTrim} OR name ILIKE ${qPat} OR shop_name ILIKE ${qPat} OR product_id ILIKE ${qPat})
+        AND (${!shopTrim} OR shop_name ILIKE ${shopPat})
+      ${orderClause}
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+  }
+
+  const total = countRow?.count ?? 0;
+  return {
+    items: rows.map(rowFromDb),
+    total,
+    totalPages: Math.ceil(total / limit) || 1,
+  };
 }
 
 async function getAll({ q = '', page = 1, limit = 20 }) {
-  const rows = await sql`SELECT * FROM products ORDER BY updated_at DESC`;
-  let items = rows.map(rowFromDb);
-  if (q) {
-    const lq = q.toLowerCase();
-    items = items.filter(
-      (p) =>
-        p.name.toLowerCase().includes(lq) ||
-        (p.shop_name || '').toLowerCase().includes(lq) ||
-        String(p.product_id).includes(lq)
-    );
-  }
-  const total = items.length;
   const offset = (page - 1) * limit;
-  return { items: items.slice(offset, offset + limit), total, totalPages: Math.ceil(total / limit) || 1 };
+  const qTrim = q.trim();
+  const qPat = qTrim ? `%${qTrim}%` : '';
+
+  let countRow;
+  let rows;
+
+  if (!qTrim) {
+    [countRow] = await sql`SELECT COUNT(*)::int AS count FROM products`;
+    rows = await sql`
+      SELECT * FROM products
+      ORDER BY updated_at DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+  } else {
+    [countRow] = await sql`
+      SELECT COUNT(*)::int AS count FROM products
+      WHERE name ILIKE ${qPat} OR shop_name ILIKE ${qPat} OR product_id ILIKE ${qPat}
+    `;
+    rows = await sql`
+      SELECT * FROM products
+      WHERE name ILIKE ${qPat} OR shop_name ILIKE ${qPat} OR product_id ILIKE ${qPat}
+      ORDER BY updated_at DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+  }
+
+  const total = countRow?.count ?? 0;
+  return {
+    items: rows.map(rowFromDb),
+    total,
+    totalPages: Math.ceil(total / limit) || 1,
+  };
 }
 
 async function getById(id) {
