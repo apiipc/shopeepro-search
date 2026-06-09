@@ -353,6 +353,62 @@ function initForms() {
   $('#heroSearchForm')?.addEventListener('submit', (e) => handleSubmit(e, $('#heroSearchInput')));
   $('#navSearchForm')?.addEventListener('submit', (e) => handleSubmit(e, $('#navSearchInput')));
   $('#loadMoreBtn')?.addEventListener('click', () => loadFeatured(true));
+  initMakeLinkTool();
+}
+
+function initMakeLinkTool() {
+  const form = $('#makeLinkForm');
+  const input = $('#makeLinkInput');
+  const btn = $('#makeLinkBtn');
+  const errEl = $('#makeLinkErr');
+  const resultEl = $('#makeLinkResult');
+  const outEl = $('#makeLinkOut');
+  const copyBtn = $('#makeLinkCopy');
+  if (!form || !input) return;
+
+  let lastLink = '';
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const url = input.value.trim();
+    if (!url) return;
+
+    errEl.hidden = true;
+    resultEl.hidden = true;
+    btn.disabled = true;
+    btn.textContent = 'Đang tạo...';
+
+    try {
+      const res = await fetch('/api/make-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Lỗi tạo link');
+
+      lastLink = data.affiliateLink;
+      outEl.href = lastLink;
+      resultEl.hidden = false;
+    } catch (err) {
+      errEl.textContent = err.message || 'Không tạo được link — thử link shopee.vn đầy đủ';
+      errEl.hidden = false;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Lấy link mua';
+    }
+  });
+
+  copyBtn?.addEventListener('click', async () => {
+    if (!lastLink) return;
+    try {
+      await navigator.clipboard.writeText(lastLink);
+      copyBtn.textContent = 'Đã copy!';
+      setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 2000);
+    } catch {
+      copyBtn.textContent = 'Copy thủ công';
+    }
+  });
 }
 
 function init() {

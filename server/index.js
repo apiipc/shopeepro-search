@@ -9,6 +9,7 @@ const { buildPriceDisplay, buildBuyerMessage } = require('./price');
 const { buildPromoInfo } = require('./promo');
 const { syncProduct } = require('./noxapi');
 const { runAutoSync } = require('./auto-sync');
+const { createAffiliateLink } = require('./affiliate-link');
 
 const envPath = path.join(__dirname, '..', '.env');
 if (fs.existsSync(envPath)) {
@@ -158,6 +159,34 @@ app.get('/api/shops', async (_req, res) => {
 
 app.get('/api/stats', async (_req, res) => {
   res.json(await db.stats());
+});
+
+app.post('/api/make-link', async (req, res) => {
+  const url = String(req.body?.url || '').trim();
+  if (!url) return res.status(400).json({ error: 'Chưa nhập link Shopee' });
+  try {
+    const result = await createAffiliateLink(url);
+    if (!result.ok) return res.status(400).json({ error: result.error });
+    res.json({
+      ok: true,
+      landingUrl: result.landingUrl,
+      affiliateLink: result.affiliateLink,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Lỗi tạo link' });
+  }
+});
+
+app.get('/go', async (req, res) => {
+  const url = String(req.query.url || '').trim();
+  if (!url) return res.status(400).send('Thiếu link');
+  try {
+    const result = await createAffiliateLink(url);
+    if (!result.ok) return res.status(400).send(result.error);
+    res.redirect(302, result.affiliateLink);
+  } catch {
+    res.status(502).send('Không tạo được link mua');
+  }
 });
 
 app.get('/api/cron/auto-sync', requireCron, async (_req, res) => {

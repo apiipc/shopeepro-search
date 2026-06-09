@@ -94,6 +94,37 @@ main { padding-top: 72px; min-height: 100vh; }
 }
 .trending { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 20px; }
 .trending span { color: var(--on-surface-variant); font-size: 13px; }
+.link-tool { padding: 0 16px 8px; }
+.link-tool-card {
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 16px;
+  padding: 20px 24px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.04);
+}
+.link-tool-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 16px; }
+.link-tool-icon { font-size: 32px; color: var(--primary); flex-shrink: 0; }
+.link-tool-head h2 { margin: 0 0 4px; font-size: 18px; }
+.link-tool-head p { margin: 0; font-size: 14px; color: var(--on-surface-variant); line-height: 1.45; }
+.link-tool-form {
+  display: flex; flex-wrap: wrap; gap: 10px;
+}
+.link-tool-form input {
+  flex: 1; min-width: 220px; height: 44px; padding: 0 14px;
+  border: 1px solid var(--outline-variant); border-radius: 10px; font-size: 15px;
+}
+.link-tool-form input:focus { outline: 2px solid var(--primary); border-color: transparent; }
+.link-tool-form button {
+  height: 44px; padding: 0 22px; border: none; border-radius: 10px;
+  color: #fff; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.link-tool-form button:disabled { opacity: .65; cursor: wait; }
+.link-tool-err { color: #ba1a1a; font-size: 14px; margin: 10px 0 0; }
+.link-tool-result {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px;
+}
+.link-tool-buy { text-decoration: none; display: inline-flex; align-items: center; }
+
 .trend-chip {
   padding: 6px 14px; border-radius: 999px; background: var(--surface-container-high);
   color: var(--on-surface-variant); font-size: 13px; text-decoration: none; cursor: pointer;
