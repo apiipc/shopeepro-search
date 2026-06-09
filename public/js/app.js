@@ -361,12 +361,7 @@ function initMakeLinkTool() {
   const input = $('#makeLinkInput');
   const btn = $('#makeLinkBtn');
   const errEl = $('#makeLinkErr');
-  const resultEl = $('#makeLinkResult');
-  const outEl = $('#makeLinkOut');
-  const copyBtn = $('#makeLinkCopy');
   if (!form || !input) return;
-
-  let lastLink = '';
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -374,9 +369,8 @@ function initMakeLinkTool() {
     if (!url) return;
 
     errEl.hidden = true;
-    resultEl.hidden = true;
     btn.disabled = true;
-    btn.textContent = 'Đang tạo...';
+    btn.textContent = 'Đang mở Shopee...';
 
     try {
       const res = await fetch('/api/make-link', {
@@ -387,26 +381,13 @@ function initMakeLinkTool() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Lỗi tạo link');
 
-      lastLink = data.affiliateLink;
-      outEl.href = lastLink;
-      resultEl.hidden = false;
+      window.open(data.affiliateLink, '_blank', 'noopener,noreferrer');
     } catch (err) {
-      errEl.textContent = err.message || 'Không tạo được link — thử link shopee.vn đầy đủ';
+      errEl.textContent = err.message || 'Không mở được — thử link shopee.vn đầy đủ';
       errEl.hidden = false;
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Lấy link mua';
-    }
-  });
-
-  copyBtn?.addEventListener('click', async () => {
-    if (!lastLink) return;
-    try {
-      await navigator.clipboard.writeText(lastLink);
-      copyBtn.textContent = 'Đã copy!';
-      setTimeout(() => { copyBtn.textContent = 'Copy link'; }, 2000);
-    } catch {
-      copyBtn.textContent = 'Copy thủ công';
+      btn.textContent = 'Mua trên Shopee';
     }
   });
 }
