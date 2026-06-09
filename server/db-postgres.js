@@ -90,6 +90,11 @@ async function seedFromJsonIfEmpty() {
   const [{ count }] = await sql`SELECT COUNT(*)::int AS count FROM products`;
   if (count > 0) return count;
 
+  if (process.env.VERCEL || process.env.VERCEL_ENV) {
+    console.log('Postgres trống — dùng Import CSV để thêm SP (bỏ qua seed JSON trên Vercel).');
+    return 0;
+  }
+
   const jsonPath = path.join(__dirname, '..', 'data', 'products.json');
   if (!fs.existsSync(jsonPath)) return 0;
 
