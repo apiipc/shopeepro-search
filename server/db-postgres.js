@@ -5,7 +5,29 @@ const { parsePrice } = require('./price');
 const { dealScore } = require('./promo');
 const { normalize, mergeImportFields } = require('./db-shared');
 
-const sql = neon(process.env.POSTGRES_URL || process.env.DATABASE_URL);
+function pgUrl() {
+  return (
+    process.env.POSTGRES_URL ||
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.POSTGRES_URL_NON_POOLING ||
+    ''
+  ).trim();
+}
+
+let sqlClient = null;
+function getSql() {
+  if (!sqlClient) {
+    const url = pgUrl();
+    if (!url) throw new Error('POSTGRES_URL chưa cấu hình');
+    sqlClient = neon(url);
+  }
+  return sqlClient;
+}
+
+function sql(strings, ...values) {
+  return getSql()(strings, ...values);
+}
 
 async function init() {
   await sql`

@@ -1,19 +1,39 @@
+const path = require('path');
+
 const onVercel = !!(process.env.VERCEL || process.env.VERCEL_ENV);
-const pgUrl = process.env.POSTGRES_URL || process.env.DATABASE_URL;
-const usePostgres = !!pgUrl;
+
+function getPostgresUrl() {
+  return (
+    process.env.POSTGRES_URL ||
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.POSTGRES_URL_NON_POOLING ||
+    ''
+  ).trim();
+}
+
+function usePostgresNow() {
+  return !!getPostgresUrl();
+}
 
 let impl = null;
+let implMode = null;
 let initPromise = null;
 
 function getImpl() {
-  if (onVercel && !usePostgres) {
+  const mode = usePostgresNow() ? 'postgres' : 'json';
+  if (onVercel && mode === 'json') {
     const err = new Error(
-      'Vercel cần POSTGRES_URL (Neon). Vào Vercel → Settings → Storage → Create Database → Neon, rồi Redeploy.'
+      'Vercel cần POSTGRES_URL (Neon). Vào Vercel → Storage → Connect to Project → Redeploy.'
     );
     err.code = 'NO_POSTGRES';
     throw err;
   }
-  if (!impl) impl = usePostgres ? require('./db-postgres') : require('./db-json');
+  if (!impl || implMode !== mode) {
+    impl = mode === 'postgres' ? require('./db-postgres') : require('./db-json');
+    implMode = mode;
+    initPromise = null;
+  }
   return impl;
 }
 
@@ -22,7 +42,7 @@ async function init() {
     initPromise = getImpl()
       .init()
       .then(() => {
-        if (usePostgres) console.log('DB: Postgres (Neon)');
+        if (usePostgresNow()) console.log('DB: Postgres (Neon)');
         else console.log('DB: JSON file');
       });
   }
@@ -38,7 +58,7 @@ function bind(name) {
 
 module.exports = {
   init,
-  usePostgres: () => usePostgres,
+  usePostgres: () => usePostgresNow(),
   onVercel: () => onVercel,
   upsertProduct: bind('upsertProduct'),
   importProducts: bind('importProducts'),
@@ -56,5 +76,6 @@ module.exports = {
   getTrending: bind('getTrending'),
   getMeta: bind('getMeta'),
   setMeta: bind('setMeta'),
-  dbPath: require('./db-json').dbPath,
+  getPostgresUrl,
+  dbPath: path.join(__dirname, '..', 'data', 'products.json'),
 };

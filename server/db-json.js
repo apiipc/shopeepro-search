@@ -6,10 +6,13 @@ const { normalize, mergeImportFields } = require('./db-shared');
 
 const dataDir = path.join(__dirname, '..', 'data');
 const dbPath = path.join(dataDir, 'products.json');
+const onVercel = !!(process.env.VERCEL || process.env.VERCEL_ENV);
 
-if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
-if (!fs.existsSync(dbPath)) {
-  fs.writeFileSync(dbPath, JSON.stringify({ products: [], nextId: 1 }, null, 2));
+if (!onVercel) {
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  if (!fs.existsSync(dbPath)) {
+    fs.writeFileSync(dbPath, JSON.stringify({ products: [], nextId: 1 }, null, 2));
+  }
 }
 
 function load() {
@@ -17,6 +20,13 @@ function load() {
 }
 
 function save(data) {
+  if (onVercel) {
+    const err = new Error(
+      'Vercel không ghi được file JSON — cần POSTGRES_URL (Neon). Redeploy sau khi Connect database.'
+    );
+    err.code = 'EROFS';
+    throw err;
+  }
   fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
 }
 
