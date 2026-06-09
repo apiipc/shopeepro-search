@@ -171,63 +171,59 @@ async function importProducts(inputs) {
   return { created, updated };
 }
 
-function searchOrderClause(sort) {
-  switch (sort) {
-    case 'deal':
-      return sql`ORDER BY (CASE WHEN original_price IS NOT NULL AND original_price <> '' THEN 1 ELSE 0 END) DESC, updated_at DESC`;
-    case 'commission':
-      return sql`ORDER BY commission_rate DESC NULLS LAST, updated_at DESC`;
-    case 'price_asc':
-      return sql`ORDER BY price ASC NULLS LAST`;
-    case 'price_desc':
-      return sql`ORDER BY price DESC NULLS LAST`;
-    default:
-      return sql`ORDER BY updated_at DESC`;
-  }
+const SORT_ORDER_SQL = {
+  deal: `ORDER BY (CASE WHEN original_price IS NOT NULL AND original_price <> '' THEN 1 ELSE 0 END) DESC, updated_at DESC`,
+  commission: 'ORDER BY commission_rate DESC NULLS LAST, updated_at DESC',
+  price_asc: 'ORDER BY price ASC NULLS LAST',
+  price_desc: 'ORDER BY price DESC NULLS LAST',
+  popular: 'ORDER BY updated_at DESC',
+};
+
+function orderByClause(sort) {
+  return SORT_ORDER_SQL[sort] || SORT_ORDER_SQL.popular;
 }
 
 async function search({ q = '', shop = '', sort = 'popular', page = 1, limit = 24, activeOnly = true }) {
   const offset = (page - 1) * limit;
   const qTrim = q.trim();
   const shopTrim = shop.trim();
-  const orderClause = searchOrderClause(sort);
+  const orderBy = orderByClause(sort);
   const qPat = qTrim ? `%${qTrim}%` : '';
   const shopPat = shopTrim ? `%${shopTrim}%` : '';
+  const query = getSql();
 
   let countRow;
   let rows;
 
   if (activeOnly && !qTrim && !shopTrim) {
     [countRow] = await sql`SELECT COUNT(*)::int AS count FROM products WHERE active = 1`;
-    rows = await sql`
-      SELECT * FROM products WHERE active = 1
-      ${orderClause}
-      LIMIT ${limit} OFFSET ${offset}
-    `;
+    rows = await query(
+      `SELECT * FROM products WHERE active = 1 ${orderBy} LIMIT $1 OFFSET $2`,
+      [limit, offset]
+    );
   } else if (activeOnly && qTrim && !shopTrim) {
     [countRow] = await sql`
       SELECT COUNT(*)::int AS count FROM products
       WHERE active = 1
         AND (name ILIKE ${qPat} OR shop_name ILIKE ${qPat} OR product_id ILIKE ${qPat})
     `;
-    rows = await sql`
-      SELECT * FROM products
-      WHERE active = 1
-        AND (name ILIKE ${qPat} OR shop_name ILIKE ${qPat} OR product_id ILIKE ${qPat})
-      ${orderClause}
-      LIMIT ${limit} OFFSET ${offset}
-    `;
+    rows = await query(
+      `SELECT * FROM products
+       WHERE active = 1
+         AND (name ILIKE $1 OR shop_name ILIKE $1 OR product_id ILIKE $1)
+       ${orderBy}
+       LIMIT $2 OFFSET $3`,
+      [qPat, limit, offset]
+    );
   } else if (activeOnly && !qTrim && shopTrim) {
     [countRow] = await sql`
       SELECT COUNT(*)::int AS count FROM products
       WHERE active = 1 AND shop_name ILIKE ${shopPat}
     `;
-    rows = await sql`
-      SELECT * FROM products
-      WHERE active = 1 AND shop_name ILIKE ${shopPat}
-      ${orderClause}
-      LIMIT ${limit} OFFSET ${offset}
-    `;
+    rows = await query(
+      `SELECT * FROM products WHERE active = 1 AND shop_name ILIKE $1 ${orderBy} LIMIT $2 OFFSET $3`,
+      [shopPat, limit, offset]
+    );
   } else if (activeOnly && qTrim && shopTrim) {
     [countRow] = await sql`
       SELECT COUNT(*)::int AS count FROM products
@@ -235,34 +231,37 @@ async function search({ q = '', shop = '', sort = 'popular', page = 1, limit = 2
         AND shop_name ILIKE ${shopPat}
         AND (name ILIKE ${qPat} OR shop_name ILIKE ${qPat} OR product_id ILIKE ${qPat})
     `;
-    rows = await sql`
-      SELECT * FROM products
-      WHERE active = 1
-        AND shop_name ILIKE ${shopPat}
-        AND (name ILIKE ${qPat} OR shop_name ILIKE ${qPat} OR product_id ILIKE ${qPat})
-      ${orderClause}
-      LIMIT ${limit} OFFSET ${offset}
-    `;
+    rows = await query(
+      `SELECT * FROM products
+       WHERE active = 1
+         AND shop_name ILIKE $1
+         AND (name ILIKE $2 OR shop_name ILIKE $2 OR product_id ILIKE $2)
+       ${orderBy}
+       LIMIT $3 OFFSET $4`,
+      [shopPat, qPat, limit, offset]
+    );
   } else if (!activeOnly && !qTrim && !shopTrim) {
     [countRow] = await sql`SELECT COUNT(*)::int AS count FROM products`;
-    rows = await sql`
-      SELECT * FROM products
-      ${orderClause}
-      LIMIT ${limit} OFFSET ${offset}
-    `;
+    rows = await query(`SELECT * FROM products ${orderBy} LIMIT $1 OFFSET $2`, [limit, offset]);
   } else {
-    [countRow] = await sql`
-      SELECT COUNT(*)::int AS count FROM products
-      WHERE (${!qTrim} OR name ILIKE ${qPat} OR shop_name ILIKE ${qPat} OR product_id ILIKE ${qPat})
-        AND (${!shopTrim} OR shop_name ILIKE ${shopPat})
-    `;
-    rows = await sql`
-      SELECT * FROM products
-      WHERE (${!qTrim} OR name ILIKE ${qPat} OR shop_name ILIKE ${qPat} OR product_id ILIKE ${qPat})
-        AND (${!shopTrim} OR shop_name ILIKE ${shopPat})
-      ${orderClause}
-      LIMIT ${limit} OFFSET ${offset}
-    `;
+    const filters = [];
+    const params = [];
+    if (qTrim) {
+      params.push(qPat);
+      const n = params.length;
+      filters.push(`(name ILIKE $${n} OR shop_name ILIKE $${n} OR product_id ILIKE $${n})`);
+    }
+    if (shopTrim) {
+      params.push(shopPat);
+      filters.push(`shop_name ILIKE $${params.length}`);
+    }
+    const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+    [countRow] = await query(`SELECT COUNT(*)::int AS count FROM products ${where}`, params);
+    params.push(limit, offset);
+    rows = await query(
+      `SELECT * FROM products ${where} ${orderBy} LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
+    );
   }
 
   const total = countRow?.count ?? 0;
