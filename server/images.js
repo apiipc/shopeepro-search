@@ -14,8 +14,12 @@ function loadCache() {
 }
 
 function saveCache(cache) {
-  fs.mkdirSync(path.dirname(CACHE_PATH), { recursive: true });
-  fs.writeFileSync(CACHE_PATH, JSON.stringify(cache, null, 2));
+  try {
+    fs.mkdirSync(path.dirname(CACHE_PATH), { recursive: true });
+    fs.writeFileSync(CACHE_PATH, JSON.stringify(cache, null, 2));
+  } catch {
+    /* Vercel: filesystem read-only — bỏ qua, ảnh lưu vào Postgres qua db.update */
+  }
 }
 
 function parseProductLink(link) {
@@ -78,9 +82,19 @@ async function fetchImageFromNox(productLink) {
   }
 }
 
+async function fetchWithTimeout(url, options = {}, ms = 12000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...options, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fetchImageFromShopee(productLink) {
   const url = productLink.startsWith('http') ? productLink : `https://shopee.vn/${productLink}`;
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     headers: {
       'User-Agent': UA,
       Accept: 'text/html',
@@ -107,8 +121,9 @@ async function getProductImage(productId, productLink) {
     return normalized;
   }
 
-  let imageUrl = link ? await fetchImageFromNox(link) : null;
-  if (!imageUrl && link) imageUrl = await fetchImageFromShopee(link);
+  let imageUrl = null;
+  if (link) imageUrl = await fetchImageFromShopee(link);
+  if (!imageUrl && link) imageUrl = await fetchImageFromNox(link);
   if (imageUrl) imageUrl = normalizeShopeeImageUrl(imageUrl);
 
   if (imageUrl) {
@@ -127,7 +142,7 @@ async function streamProductImage(productId, res) {
   if (!imageUrl) imageUrl = await getProductImage(productId, product?.product_link);
   if (!imageUrl) return false;
 
-  const imgRes = await fetch(imageUrl, {
+  const imgRes = await fetchWithTimeout(imageUrl, {
     headers: {
       'User-Agent': UA,
       Referer: 'https://shopee.vn/',

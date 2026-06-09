@@ -17,6 +17,7 @@ function parseProductRow(row) {
     commission: String(row['Hoa hồng'] || row.commission || '').trim(),
     product_link: String(row['Link sản phẩm'] || row.product_link || '').trim(),
     affiliate_link: affiliateLink,
+    image_url: String(row['Link ảnh'] || row.image_url || row.imageUrl || '').trim(),
     active: 1,
   };
 }

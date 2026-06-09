@@ -34,13 +34,15 @@ function setUrl(params) {
 }
 
 function placeholderImg(name) {
-  const letter = (name || 'S')[0].toUpperCase();
+  const clean = String(name || 'S').replace(/^[\[\(【「『]+/, '').trim();
+  const letter = (clean[0] || 'S').toUpperCase();
   return `data:image/svg+xml,${encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect fill="#eee" width="200" height="200"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#b22204" font-size="48" font-family="sans-serif">${letter}</text></svg>`
   )}`;
 }
 
 function productImageUrl(p) {
+  if (p.imageUrl) return p.imageUrl;
   if (p.productId) return `/api/product-image/${encodeURIComponent(p.productId)}`;
   return placeholderImg(p.name);
 }

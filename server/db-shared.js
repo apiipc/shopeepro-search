@@ -7,6 +7,7 @@ const CSV_MERGE_FIELDS = [
   'commission',
   'product_link',
   'affiliate_link',
+  'image_url',
 ];
 
 function normalize(row) {
