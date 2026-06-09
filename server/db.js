@@ -1,19 +1,30 @@
-const usePostgres = !!(process.env.POSTGRES_URL || process.env.DATABASE_URL);
+const onVercel = !!(process.env.VERCEL || process.env.VERCEL_ENV);
+const pgUrl = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+const usePostgres = !!pgUrl;
 
 let impl = null;
 let initPromise = null;
 
 function getImpl() {
+  if (onVercel && !usePostgres) {
+    const err = new Error(
+      'Vercel cần POSTGRES_URL (Neon). Vào Vercel → Settings → Storage → Create Database → Neon, rồi Redeploy.'
+    );
+    err.code = 'NO_POSTGRES';
+    throw err;
+  }
   if (!impl) impl = usePostgres ? require('./db-postgres') : require('./db-json');
   return impl;
 }
 
 async function init() {
   if (!initPromise) {
-    initPromise = getImpl().init().then(() => {
-      if (usePostgres) console.log('DB: Postgres (Neon)');
-      else console.log('DB: JSON file');
-    });
+    initPromise = getImpl()
+      .init()
+      .then(() => {
+        if (usePostgres) console.log('DB: Postgres (Neon)');
+        else console.log('DB: JSON file');
+      });
   }
   return initPromise;
 }
@@ -28,6 +39,7 @@ function bind(name) {
 module.exports = {
   init,
   usePostgres: () => usePostgres,
+  onVercel: () => onVercel,
   upsertProduct: bind('upsertProduct'),
   importProducts: bind('importProducts'),
   search: bind('search'),

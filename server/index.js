@@ -252,11 +252,20 @@ app.delete('/api/admin/products/:id', requireAdmin, async (req, res) => {
 
 app.post('/api/admin/import-csv', requireAdmin, upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Chưa chọn file CSV' });
+  if (db.onVercel() && !db.usePostgres()) {
+    return res.status(503).json({
+      error:
+        'Import trên Vercel cần Postgres (Neon). Thêm POSTGRES_URL trong Vercel Settings → Environment Variables, rồi Redeploy.',
+    });
+  }
   try {
     const result = await importCsvContent(req.file.buffer.toString('utf-8'));
     res.json(result);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    const msg = err.code === 'EROFS' || /read-only file system/i.test(err.message)
+      ? 'Không ghi được file trên Vercel — cần cấu hình POSTGRES_URL (Neon database).'
+      : err.message;
+    res.status(400).json({ error: msg });
   }
 });
 

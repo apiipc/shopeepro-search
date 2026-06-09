@@ -41,6 +41,8 @@ async function init() {
   const count = await seedFromJsonIfEmpty();
   console.log(`Postgres sẵn sàng: ${count} sản phẩm`);
 }
+
+function rowFromDb(r) {
   if (!r) return null;
   return normalize({
     ...r,
@@ -48,6 +50,18 @@ async function init() {
     created_at: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at,
     updated_at: r.updated_at instanceof Date ? r.updated_at.toISOString() : r.updated_at,
   });
+}
+
+async function getMeta(key) {
+  const rows = await sql`SELECT value FROM app_meta WHERE key = ${key}`;
+  return rows[0]?.value ?? null;
+}
+
+async function setMeta(key, value) {
+  await sql`
+    INSERT INTO app_meta (key, value) VALUES (${key}, ${String(value)})
+    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+  `;
 }
 
 async function seedFromJsonIfEmpty() {
@@ -80,18 +94,6 @@ async function seedFromJsonIfEmpty() {
 
   const [{ count: after }] = await sql`SELECT COUNT(*)::int AS count FROM products`;
   return after;
-}
-
-function rowFromDb(r) {
-  const rows = await sql`SELECT value FROM app_meta WHERE key = ${key}`;
-  return rows[0]?.value ?? null;
-}
-
-async function setMeta(key, value) {
-  await sql`
-    INSERT INTO app_meta (key, value) VALUES (${key}, ${String(value)})
-    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
-  `;
 }
 
 async function upsertProduct(input) {
