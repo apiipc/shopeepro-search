@@ -58,8 +58,8 @@
             <p>Dán link sản phẩm hoặc shop → bấm một nút → vào Shopee mua deal</p>
           </div>
         </div>
-        <form class="link-tool-form" id="makeLinkForm">
-          <input type="url" id="makeLinkInput" placeholder="https://shopee.vn/product/... hoặc link shop / shp.ee" autocomplete="off"/>
+        <form class="link-tool-form" id="makeLinkForm" method="get" action="/go">
+          <input type="text" name="url" id="makeLinkInput" placeholder="https://shopee.vn/product/... hoặc link shop / shp.ee" autocomplete="off" required/>
           <button type="submit" class="shopee-gradient" id="makeLinkBtn">Mua trên Shopee</button>
         </form>
         <p class="link-tool-err" id="makeLinkErr" hidden></p>

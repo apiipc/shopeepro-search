@@ -363,32 +363,16 @@ function initMakeLinkTool() {
   const errEl = $('#makeLinkErr');
   if (!form || !input) return;
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
+  form.addEventListener('submit', (e) => {
     const url = input.value.trim();
-    if (!url) return;
-
+    if (!url) {
+      e.preventDefault();
+      return;
+    }
     errEl.hidden = true;
+    input.value = url;
     btn.disabled = true;
     btn.textContent = 'Đang mở Shopee...';
-
-    try {
-      const res = await fetch('/api/make-link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Lỗi tạo link');
-
-      window.open(data.affiliateLink, '_blank', 'noopener,noreferrer');
-    } catch (err) {
-      errEl.textContent = err.message || 'Không mở được — thử link shopee.vn đầy đủ';
-      errEl.hidden = false;
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Mua trên Shopee';
-    }
   });
 }
 

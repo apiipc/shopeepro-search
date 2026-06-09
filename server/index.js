@@ -182,7 +182,13 @@ app.get('/go', async (req, res) => {
   if (!url) return res.status(400).send('Thiếu link');
   try {
     const result = await createAffiliateLink(url);
-    if (!result.ok) return res.status(400).send(result.error);
+    if (!result.ok) {
+      return res
+        .status(400)
+        .send(
+          `<!DOCTYPE html><html lang="vi"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><body style="font-family:sans-serif;padding:24px"><p>${result.error}</p><p><a href="/">← Về ShopeePro</a></p></body></html>`
+        );
+    }
     res.redirect(302, result.affiliateLink);
   } catch {
     res.status(502).send('Không tạo được link mua');

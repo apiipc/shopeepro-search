@@ -53,18 +53,29 @@ async function resolveLandingUrl(raw) {
   }
 
   try {
-    const res = await fetchWithTimeout(parsed.toString(), {
-      method: 'GET',
-      redirect: 'follow',
-      headers: { 'User-Agent': UA, Accept: 'text/html' },
-    });
-    const final = res.url || parsed.toString();
-    if (!isShopeeHost(new URL(final).hostname)) {
-      return { ok: false, error: 'Không mở được link Shopee — hãy dán link shopee.vn đầy đủ' };
+    let current = parsed.toString();
+    for (let i = 0; i < 6; i++) {
+      const res = await fetchWithTimeout(current, {
+        method: 'HEAD',
+        redirect: 'manual',
+        headers: { 'User-Agent': UA, Accept: 'text/html' },
+      });
+      if (res.status >= 300 && res.status < 400) {
+        const loc = res.headers.get('location');
+        if (!loc) break;
+        current = new URL(loc, current).toString();
+        continue;
+      }
+      current = res.url || current;
+      break;
     }
-    return { ok: true, landingUrl: cleanLandingUrl(final) };
+    const finalHost = new URL(current).hostname;
+    if (finalHost.includes('shopee.vn')) {
+      return { ok: true, landingUrl: cleanLandingUrl(current) };
+    }
+    return { ok: true, landingUrl: parsed.toString() };
   } catch {
-    return { ok: false, error: 'Không mở được link rút gọn — thử dán link shopee.vn đầy đủ' };
+    return { ok: true, landingUrl: parsed.toString() };
   }
 }
 
