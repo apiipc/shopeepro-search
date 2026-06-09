@@ -39,12 +39,17 @@
         <input type="text" id="adminSearch" placeholder="Tìm sản phẩm..." style="padding:8px 12px;border:1px solid #e3beb6;border-radius:6px"/>
         <button class="btn btn-primary btn-sm" id="addProductBtn">+ Thêm sản phẩm</button>
         <button class="btn btn-secondary btn-sm" id="syncNoxBtn" title="Cập nhật giá, giá gốc, ảnh từ Shopee qua NoxAPI">Sync NoxAPI</button>
-        <label class="btn btn-secondary btn-sm" style="cursor:pointer" title="Trùng mã sản phẩm → tự cập nhật, không tạo bản ghi mới">
-          Import CSV
+        <label class="btn btn-secondary btn-sm" id="csvImportLabel" style="cursor:pointer" title="Trùng mã sản phẩm → tự cập nhật, không tạo bản ghi mới">
+          <span id="csvImportLabelText">Import CSV</span>
           <input type="file" id="csvUpload" accept=".csv" hidden/>
         </label>
         <button class="btn btn-secondary btn-sm" id="logoutBtn">Đăng xuất</button>
       </div>
+    </div>
+
+    <div id="importStatus" class="import-status hidden" role="status" aria-live="polite">
+      <span class="import-spinner" aria-hidden="true"></span>
+      <span id="importStatusText">Đang import CSV…</span>
     </div>
 
     <div class="admin-table-wrap">

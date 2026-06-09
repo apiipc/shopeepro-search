@@ -268,7 +268,24 @@ footer {
 .modal h2 { margin: 0 0 20px; }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
 .toast {
-  position: fixed; bottom: 24px; right: 24px; background: #1a1c1c; color: white;
-  padding: 12px 20px; border-radius: 8px; z-index: 200; display: none;
+  position: fixed; bottom: 24px; right: 24px; left: 24px; max-width: 480px; margin-left: auto;
+  background: #1a1c1c; color: white; padding: 14px 20px; border-radius: 10px; z-index: 200;
+  display: none; font-size: 14px; line-height: 1.45; box-shadow: 0 8px 28px rgba(0,0,0,.22);
 }
 .toast.show { display: block; }
+.toast.success { background: #1b5e20; }
+.toast.error { background: #b71c1c; }
+.toast.info { background: #1565c0; }
+
+.import-status {
+  display: flex; align-items: center; gap: 12px; margin: 0 0 16px; padding: 12px 16px;
+  background: #fff8f6; border: 1px solid #ffd4cc; border-radius: 10px; color: #8b2e1f;
+  font-size: 14px; font-weight: 500;
+}
+.import-status.hidden { display: none; }
+.import-spinner {
+  width: 18px; height: 18px; border: 2px solid #ffd4cc; border-top-color: #ee4d2d;
+  border-radius: 50%; animation: sp-spin .7s linear infinite; flex-shrink: 0;
+}
+@keyframes sp-spin { to { transform: rotate(360deg); } }
+#csvImportLabel.is-loading { opacity: .65; cursor: wait !important; pointer-events: none; }

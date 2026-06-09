@@ -6,11 +6,34 @@ let debounceTimer;
 
 const $ = (s) => document.querySelector(s);
 
-function toast(msg) {
+let toastHideTimer;
+
+function toast(msg, opts = {}) {
+  const { type = '', duration = type === 'error' ? 7000 : 4500 } = opts;
   const el = $('#toast');
+  clearTimeout(toastHideTimer);
   el.textContent = msg;
-  el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 3000);
+  el.className = 'toast show' + (type ? ` ${type}` : '');
+  if (duration > 0) {
+    toastHideTimer = setTimeout(() => el.classList.remove('show'), duration);
+  }
+}
+
+function setImportLoading(on, text) {
+  const label = $('#csvImportLabel');
+  const labelText = $('#csvImportLabelText');
+  const status = $('#importStatus');
+  const statusText = $('#importStatusText');
+  if (on) {
+    label.classList.add('is-loading');
+    labelText.textContent = 'Đang import…';
+    status.classList.remove('hidden');
+    statusText.textContent = text || 'Đang import CSV…';
+  } else {
+    label.classList.remove('is-loading');
+    labelText.textContent = 'Import CSV';
+    status.classList.add('hidden');
+  }
 }
 
 function headers() {
@@ -195,22 +218,59 @@ async function deleteProduct(id) {
 }
 
 async function uploadCsv(file) {
-  const fd = new FormData();
-  fd.append('file', file);
-  const res = await fetch('/api/admin/import-csv', {
-    method: 'POST',
-    headers: { 'X-Admin-Token': token },
-    body: fd,
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error);
-  const parts = [];
-  if (data.created) parts.push(`${data.created} mới`);
-  if (data.updated) parts.push(`${data.updated} cập nhật`);
-  if (data.duplicatesInFile) parts.push(`${data.duplicatesInFile} trùng đã gộp`);
-  if (data.skipped) parts.push(`${data.skipped} bỏ qua`);
-  toast(parts.length ? `Import: ${parts.join(', ')}` : 'Không có dòng hợp lệ');
-  loadProducts();
+  const name = file.name;
+  const sizeKb = Math.max(1, Math.round(file.size / 1024));
+  setImportLoading(true, `Đang import «${name}» (${sizeKb} KB) — file lớn có thể mất 1–2 phút…`);
+  toast(`Đang import ${name}…`, { type: 'info', duration: 0 });
+
+  const controller = new AbortController();
+  const abortTimer = setTimeout(() => controller.abort(), 300000);
+
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch('/api/admin/import-csv', {
+      method: 'POST',
+      headers: { 'X-Admin-Token': token },
+      body: fd,
+      signal: controller.signal,
+    });
+
+    let data = {};
+    try {
+      data = await res.json();
+    } catch {
+      throw new Error('Phản hồi server không hợp lệ — thử lại hoặc chia file nhỏ hơn');
+    }
+
+    if (!res.ok) throw new Error(data.error || `Lỗi server (${res.status})`);
+
+    const parts = [];
+    if (data.created) parts.push(`${data.created} mới`);
+    if (data.updated) parts.push(`${data.updated} cập nhật`);
+    if (data.duplicatesInFile) parts.push(`${data.duplicatesInFile} trùng đã gộp`);
+    if (data.skipped) parts.push(`${data.skipped} bỏ qua`);
+
+    const total = data.processed ?? data.imported ?? data.totalRows;
+    const summary = parts.length ? parts.join(', ') : 'không có dòng hợp lệ';
+    const msg = parts.length
+      ? `Import xong: ${summary}${total != null ? ` · ${total} dòng xử lý` : ''}`
+      : 'Import xong nhưng không có dòng hợp lệ — kiểm tra cột Link ưu đãi trong CSV';
+
+    toast(msg, { type: parts.length ? 'success' : 'error' });
+    setImportLoading(false);
+    await loadProducts();
+  } catch (err) {
+    const msg =
+      err.name === 'AbortError'
+        ? 'Import quá lâu (>5 phút) — thử chia CSV thành nhiều file nhỏ hơn'
+        : err.message || 'Import thất bại';
+    toast(msg, { type: 'error' });
+    setImportLoading(false);
+    throw err;
+  } finally {
+    clearTimeout(abortTimer);
+  }
 }
 
 async function syncNoxBatch(offset = 0) {
@@ -266,8 +326,8 @@ function init() {
     if (!file) return;
     try {
       await uploadCsv(file);
-    } catch (err) {
-      toast(err.message);
+    } catch {
+      /* uploadCsv đã hiện toast lỗi */
     }
     e.target.value = '';
   });
